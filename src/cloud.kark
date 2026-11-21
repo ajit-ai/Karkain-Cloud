@@ -1,0 +1,133 @@
+// Karkain-Cloud - cloud provider abstraction model.
+// Karkain Language v1.2.0 verified baseline (tag v1.2.0,
+// commit 77d70693e1e3134dac312a303bffafa7d50fa988).
+//
+// Scope boundary: this framework models provider resources and their
+// lifecycle state in portable Karkain. It does not call cloud APIs,
+// authenticate with providers or claim any vendor integration.
+//
+// Account representation: [name, resource, kind, state, ...].
+
+// new_account creates an empty named cloud account model.
+public func new_account(name) {
+    let a = []
+    a = push(a, name)
+    return a
+}
+
+// account_name returns the account name.
+public func account_name(account) {
+    return account[0]
+}
+
+// add_resource registers a resource in the stopped state.
+public func add_resource(account, name, kind) {
+    let out = remove_resource(account, name)
+    out = push(out, name)
+    out = push(out, kind)
+    out = push(out, "stopped")
+    return out
+}
+
+// remove_resource deletes a resource.
+public func remove_resource(account, name) {
+    let out = []
+    out = push(out, account[0])
+    let i = 1
+    while (i < len(account)) {
+        if account[i] == name {
+            i = i + 3
+        } else {
+            out = push(out, account[i])
+            out = push(out, account[i + 1])
+            out = push(out, account[i + 2])
+            i = i + 3
+        }
+    }
+    return out
+}
+
+// resource_count returns the number of resources.
+public func resource_count(account) {
+    return (len(account) - 1) / 3
+}
+
+// resource_state returns a resource state or "missing".
+public func resource_state(account, name) {
+    let i = 1
+    while (i < len(account)) {
+        if account[i] == name {
+            return account[i + 2]
+        }
+        i = i + 3
+    }
+    return "missing"
+}
+
+// set_resource_state updates a known resource state.
+public func set_resource_state(account, name, state) {
+    if resource_state(account, name) == "missing" {
+        return account
+    }
+    let out = []
+    out = push(out, account[0])
+    let i = 1
+    while (i < len(account)) {
+        if account[i] == name {
+            out = push(out, account[i])
+            out = push(out, account[i + 1])
+            out = push(out, state)
+        } else {
+            out = push(out, account[i])
+            out = push(out, account[i + 1])
+            out = push(out, account[i + 2])
+        }
+        i = i + 3
+    }
+    return out
+}
+
+// start_resource marks a resource running.
+public func start_resource(account, name) {
+    return set_resource_state(account, name, "running")
+}
+
+// stop_resource marks a resource stopped.
+public func stop_resource(account, name) {
+    return set_resource_state(account, name, "stopped")
+}
+
+// resource_kind returns the declared kind or "".
+public func resource_kind(account, name) {
+    let i = 1
+    while (i < len(account)) {
+        if account[i] == name {
+            return account[i + 1]
+        }
+        i = i + 3
+    }
+    return ""
+}
+
+// count_by_kind counts resources of a given kind.
+public func count_by_kind(account, kind) {
+    let n = 0
+    let i = 1
+    while (i < len(account)) {
+        if account[i + 1] == kind {
+            n = n + 1
+        }
+        i = i + 3
+    }
+    return n
+}
+
+// estimate_cost multiplies resource count by a per-resource rate.
+public func estimate_cost(account, rate) {
+    return resource_count(account) * rate
+}
+
+// describe_resource builds a one-line resource diagnostic.
+public func describe_resource(account, name) {
+    return name + ":" + resource_kind(account, name) + ":" + resource_state(account, name)
+}

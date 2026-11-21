@@ -1,0 +1,62 @@
+// Native tests for Karkain-Cloud.
+
+func sample_account() {
+    let a = add_resource(new_account("prod"), "web", "compute")
+    a = add_resource(a, "db", "database")
+    return add_resource(a, "cache", "compute")
+}
+
+func test_new_account() {
+    assert_eq(account_name(new_account("prod")), "prod")
+    assert_eq(resource_count(new_account("prod")), 0)
+}
+
+func test_add_resource() {
+    let a = sample_account()
+    assert_eq(resource_count(a), 3)
+    assert_eq(resource_state(a, "web"), "stopped")
+    assert_eq(resource_kind(a, "db"), "database")
+}
+
+func test_add_resource_replaces() {
+    let a = add_resource(sample_account(), "web", "storage")
+    assert_eq(resource_count(a), 3)
+    assert_eq(resource_kind(a, "web"), "storage")
+}
+
+func test_start_stop() {
+    let a = start_resource(sample_account(), "web")
+    assert_eq(resource_state(a, "web"), "running")
+    let s = stop_resource(a, "web")
+    assert_eq(resource_state(s, "web"), "stopped")
+    assert_eq(resource_state(sample_account(), "web"), "stopped")
+}
+
+func test_set_unknown_noop() {
+    let a = set_resource_state(new_account("p"), "x", "running")
+    assert_eq(resource_count(a), 0)
+}
+
+func test_count_by_kind() {
+    let a = sample_account()
+    assert_eq(count_by_kind(a, "compute"), 2)
+    assert_eq(count_by_kind(a, "database"), 1)
+}
+
+func test_estimate_cost() {
+    let a = sample_account()
+    assert_eq(estimate_cost(a, 5), 15)
+    assert_eq(estimate_cost(new_account("x"), 5), 0)
+}
+
+func test_remove_resource() {
+    let a = remove_resource(sample_account(), "web")
+    assert_eq(resource_count(a), 2)
+    assert_eq(resource_state(a, "web"), "missing")
+}
+
+func test_describe_resource() {
+    let a = sample_account()
+    assert_eq(describe_resource(a, "web"), "web:compute:stopped")
+    assert_eq(describe_resource(a, "x"), "x::missing")
+}

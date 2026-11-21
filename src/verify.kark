@@ -1,0 +1,11 @@
+// Integration verification for the Karkain-Cloud public API.
+import cloud
+
+func main() {
+    let a = add_resource(add_resource(new_account("prod"), "web", "compute"), "db", "database")
+    a = start_resource(a, "web")
+    assert_eq(resource_count(a), 2)
+    assert_eq(resource_state(a, "web"), "running")
+    println(describe_resource(a, "web"))
+    println("cost=" + str(estimate_cost(a, 10)))
+}

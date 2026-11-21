@@ -1,0 +1,14 @@
+// Karkain-Cloud runnable example: model a small cloud account.
+import cloud
+
+func main() {
+    let a = new_account("staging")
+    a = add_resource(a, "api", "compute")
+    a = add_resource(a, "worker", "compute")
+    a = add_resource(a, "db", "database")
+    a = start_resource(a, "api")
+
+    println(describe_resource(a, "api"))
+    println("compute=" + str(count_by_kind(a, "compute")))
+    println("cost=" + str(estimate_cost(a, 3)))
+}
