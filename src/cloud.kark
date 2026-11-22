@@ -131,3 +131,249 @@ public func estimate_cost(account, rate) {
 public func describe_resource(account, name) {
     return name + ":" + resource_kind(account, name) + ":" + resource_state(account, name)
 }
+
+// ---------------------------------------------------------------------------
+// Phase 2 additions. Phase 1 account/resource API is unchanged. All cloud
+// operations below are planning and validation logic; no provider API is
+// called, so deployment, billing and secret storage are BLOCKED.
+
+// new_provider_registry creates an empty provider registry.
+public func new_provider_registry() {
+    return []
+}
+
+// register_provider adds a provider with capabilities.
+public func register_provider(registry, name, capabilities) {
+    let out = registry
+    out = push(out, name)
+    out = push(out, capabilities)
+    return out
+}
+
+// provider_supports reports whether a capability is advertised.
+public func provider_supports(registry, name, capability) {
+    let j = 0
+    while (j < len(registry)) {
+        if registry[j] == name {
+            return contains(registry[j + 1], capability)
+        }
+        j = j + 2
+    }
+    return false
+}
+
+// provider_count returns the number of registered providers.
+public func provider_count(registry) { return len(registry) / 2 }
+
+// new_resource_def creates cloud resource metadata.
+public func new_resource_def(id, kind, region) {
+    let r = []
+    r = push(r, id)
+    r = push(r, kind)
+    r = push(r, region)
+    return r
+}
+
+// resource_id returns a resource id.
+public func resource_id(definition) { return definition[0] }
+
+// resource_region returns a resource region.
+public func resource_region(definition) { return definition[2] }
+
+// new_deployment creates a deployment plan.
+public func new_deployment(name, version, environment) {
+    let d = []
+    d = push(d, name)
+    d = push(d, version)
+    d = push(d, environment)
+    return d
+}
+
+// deployment_add_resource appends a resource to a deployment.
+public func deployment_add_resource(deployment, resource) { return push(deployment, resource) }
+
+// deployment_size returns the number of resources in a deployment.
+public func deployment_size(deployment) { return len(deployment) - 3 }
+
+// validate_deployment rejects plans with no resources.
+public func validate_deployment(deployment) { return deployment_size(deployment) > 0 }
+
+// new_dependency_graph creates an empty deployment dependency graph.
+public func new_dependency_graph() {
+    return []
+}
+
+// cloud_depends records a deployment dependency.
+public func cloud_depends(graph, from, required) {
+    let out = graph
+    out = push(out, from)
+    out = push(out, required)
+    return out
+}
+
+// cloud_reachable performs a bounded dependency walk.
+public func cloud_reachable(graph, from, target, depth) {
+    if from == target { return true }
+    if depth == 0 { return false }
+    let i = 0
+    while (i < len(graph)) {
+        if graph[i] == from {
+            if cloud_reachable(graph, graph[i + 1], target, depth - 1) { return true }
+        }
+        i = i + 2
+    }
+    return false
+}
+
+// cloud_has_cycle reports a deployment dependency cycle.
+public func cloud_has_cycle(graph, depth) {
+    let i = 0
+    while (i < len(graph)) {
+        if cloud_reachable(graph, graph[i + 1], graph[i], depth) { return true }
+        i = i + 2
+    }
+    return false
+}
+
+// new_profile creates a deployment profile.
+public func new_profile(name) {
+    let p = []
+    p = push(p, name)
+    return p
+}
+
+// profile_set records a profile key/value.
+public func profile_set(profile, key, value) {
+    let out = profile
+    out = push(out, key)
+    out = push(out, value)
+    return out
+}
+
+// profile_get returns a profile value or a fallback.
+public func profile_get(profile, key, fallback) {
+    let i = 1
+    while (i < len(profile)) {
+        if profile[i] == key { return profile[i + 1] }
+        i = i + 2
+    }
+    return fallback
+}
+
+// validate_cloud_config counts empty keys in a profile.
+public func validate_cloud_config(profile) {
+    let n = 0
+    let i = 1
+    while (i < len(profile)) {
+        if len(profile[i]) == 0 { n = n + 1 }
+        i = i + 2
+    }
+    return n
+}
+
+// provision_contract documents the missing provider operation.
+public func provision_contract() { return "provider.provision(resource,region)" }
+
+// deprovision_contract documents the missing cleanup operation.
+public func deprovision_contract() { return "provider.deprovision(resource_id)" }
+
+// new_outcome creates a deployment outcome.
+public func new_outcome(id, state) {
+    let o = []
+    o = push(o, id)
+    o = push(o, state)
+    return o
+}
+
+// outcome_state returns a deployment state.
+public func outcome_state(outcome) { return outcome[1] }
+
+// rollback_plan documents rollback metadata.
+public func rollback_plan(name) { return "rollback:" + name }
+
+// recovery_plan documents recovery metadata.
+public func recovery_plan(name) { return "recover:" + name }
+
+// new_scaling creates a scaling policy.
+public func new_scaling(minimum, maximum) {
+    let s = []
+    s = push(s, minimum)
+    s = push(s, maximum)
+    return s
+}
+
+// scaling_within reports whether a capacity fits a policy.
+public func scaling_within(policy, current) {
+    if current < policy[0] { return false }
+    if current > policy[1] { return false }
+    return true
+}
+
+// new_health creates health/readiness metadata.
+public func new_health(name, state, ready) {
+    let h = []
+    h = push(h, name)
+    h = push(h, state)
+    h = push(h, ready)
+    return h
+}
+
+// health_ready reports readiness.
+public func health_ready(health) { return health[2] }
+
+// new_usage creates an empty usage record store.
+public func new_usage() {
+    return []
+}
+
+// usage_add appends a service/amount usage record.
+public func usage_add(records, service, amount) {
+    let out = records
+    out = push(out, service)
+    out = push(out, amount)
+    return out
+}
+
+// usage_total aggregates recorded usage amounts.
+public func usage_total(records) {
+    let total = 0
+    let i = 0
+    while (i < len(records)) {
+        total = total + records[i + 1]
+        i = i + 2
+    }
+    return total
+}
+
+// secret_reference returns a provider reference, never a secret value.
+public func secret_reference(vault, id) { return vault + ":" + id }
+
+// redact_secret masks a secret value.
+public func redact_secret(value) {
+    if len(value) == 0 { return "" }
+    return "***"
+}
+
+// cloud_error maps provider error codes to names.
+public func cloud_error(code) {
+    if code == 1 { return "auth" }
+    if code == 2 { return "quota" }
+    if code == 3 { return "unavailable" }
+    return "unknown"
+}
+
+// new_cloud_retry creates a provider retry policy.
+public func new_cloud_retry(max_attempts) {
+    let r = []
+    r = push(r, max_attempts)
+    return r
+}
+
+// cloud_should_retry reports whether another attempt is allowed.
+public func cloud_should_retry(policy, attempts) { return attempts < policy[0] }
+
+// distributed_contract documents Cloud to Distributed integration.
+public func distributed_contract() { return "cloud.node(id,region)" }
+
+// observability_contract documents Cloud to Observability integration.
+public func observability_contract() { return "observability.health(provider,state)" }

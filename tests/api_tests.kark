@@ -60,3 +60,86 @@ func test_describe_resource() {
     assert_eq(describe_resource(a, "web"), "web:compute:stopped")
     assert_eq(describe_resource(a, "x"), "x::missing")
 }
+
+// --- Phase 2 regression ---
+
+func test_phase1_regression() {
+    let a = add_resource(new_account("p"), "web", "compute")
+    assert_eq(resource_count(a), 1)
+    assert_eq(resource_state(start_resource(a, "web"), "web"), "running")
+    assert_eq(estimate_cost(a, 5), 5)
+}
+
+// --- Phase 2 additions ---
+
+func test_provider_registry() {
+    let r = register_provider(register_provider(new_provider_registry(), "p1", "compute,storage"), "p2", "compute")
+    assert_eq(provider_count(r), 2)
+    assert(provider_supports(r, "p1", "compute"))
+    assert(provider_supports(r, "p1", "network") == false)
+    assert(provider_supports(r, "none", "compute") == false)
+}
+
+func test_resource_definitions() {
+    let d = new_resource_def("r1", "vm", "us-east")
+    assert_eq(resource_id(d), "r1")
+    assert_eq(resource_region(d), "us-east")
+    assert_eq(d[1], "vm")
+}
+
+func test_deployment_plans() {
+    let d = deployment_add_resource(deployment_add_resource(new_deployment("app", "1.0", "prod"), "web"), "db")
+    assert_eq(deployment_size(d), 2)
+    assert(validate_deployment(d))
+    assert(validate_deployment(new_deployment("app", "1.0", "prod")) == false)
+    assert_eq(outcome_state(new_outcome("o1", "succeeded")), "succeeded")
+    assert_eq(rollback_plan("app"), "rollback:app")
+    assert_eq(recovery_plan("app"), "recover:app")
+}
+
+func test_dependency_graph() {
+    let g = cloud_depends(cloud_depends(new_dependency_graph(), "web", "db"), "db", "cache")
+    assert(cloud_reachable(g, "web", "cache", 4))
+    assert(cloud_has_cycle(g, 4) == false)
+    let cyclic = cloud_depends(g, "cache", "web")
+    assert(cloud_has_cycle(cyclic, 4))
+}
+
+func test_profiles_and_validation() {
+    let p = profile_set(profile_set(new_profile("prod"), "region", "us-east"), "tier", "standard")
+    assert_eq(profile_get(p, "region", ""), "us-east")
+    assert_eq(profile_get(p, "none", "x"), "x")
+    assert_eq(validate_cloud_config(profile_set(new_profile("p"), "", "bad")), 1)
+    assert_eq(validate_cloud_config(new_profile("p")), 0)
+}
+
+func test_contracts_and_secrets() {
+    assert_eq(provision_contract(), "provider.provision(resource,region)")
+    assert_eq(deprovision_contract(), "provider.deprovision(resource_id)")
+    assert_eq(secret_reference("vault", "key"), "vault:key")
+    assert_eq(redact_secret("secret"), "***")
+    assert_eq(redact_secret(""), "")
+}
+
+func test_scaling_health() {
+    let s = new_scaling(1, 5)
+    assert(scaling_within(s, 3))
+    assert(scaling_within(s, 0) == false)
+    assert(scaling_within(s, 6) == false)
+    assert(health_ready(new_health("api", "healthy", true)))
+    assert(health_ready(new_health("api", "healthy", false)) == false)
+}
+
+func test_usage_errors_and_contracts() {
+    let usage = usage_add(usage_add(new_usage(), "cpu", 3), "storage", 2)
+    assert_eq(usage_total(usage), 5)
+    assert_eq(cloud_error(1), "auth")
+    assert_eq(cloud_error(2), "quota")
+    assert_eq(cloud_error(3), "unavailable")
+    assert_eq(cloud_error(9), "unknown")
+    let retry = new_cloud_retry(3)
+    assert(cloud_should_retry(retry, 2))
+    assert(cloud_should_retry(retry, 3) == false)
+    assert_eq(distributed_contract(), "cloud.node(id,region)")
+    assert_eq(observability_contract(), "observability.health(provider,state)")
+}

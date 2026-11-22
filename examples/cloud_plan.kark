@@ -1,0 +1,18 @@
+// Karkain-Cloud Phase 2 example: deployment planning and validation.
+import cloud
+
+func main() {
+    let providers = register_provider(new_provider_registry(), "test", "compute,storage")
+    println("compute=" + str(provider_supports(providers, "test", "compute")))
+
+    let plan = deployment_add_resource(new_deployment("app", "1.0", "prod"), "web")
+    println("valid=" + str(validate_deployment(plan)))
+
+    let graph = cloud_depends(new_dependency_graph(), "web", "db")
+    println("cycle=" + str(cloud_has_cycle(graph, 4)))
+
+    let profile = profile_set(new_profile("prod"), "region", "us-east")
+    println("region=" + profile_get(profile, "region", ""))
+    println("secret=" + secret_reference("vault", "api-key"))
+    println("rollback=" + rollback_plan("app"))
+}
